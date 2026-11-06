@@ -1,3 +1,4 @@
+
 """Central configuration and utility helpers for SEFS."""
 
 from __future__ import annotations
@@ -31,8 +32,10 @@ SIMILARITY_FALLBACK_THRESHOLD = 0.42
 TFIDF_FALLBACK_THRESHOLD = 0.04
 FORCED_PAIR_MIN_SIMILARITY = 0.30
 
-DASHBOARD_HOST = "127.0.0.1"
-DASHBOARD_PORT = 8050
+# Render deployment configuration
+DASHBOARD_HOST = "0.0.0.0"
+DASHBOARD_PORT = int(os.environ.get("PORT", 8050))
+
 REFRESH_INTERVAL_MS = 3000
 DEFAULT_SEARCH_TOP_K = 5
 MAX_SEARCH_TOP_K = 10
@@ -46,28 +49,10 @@ SEARCH_MIN_COMBINED_SCORE = 0.12
 SEARCH_MIN_LEXICAL_SCORE = 0.05
 SEARCH_MIN_TOKEN_LENGTH = 3
 SEARCH_QUERY_NOISE_TOKENS = {
-    "about",
-    "answer",
-    "define",
-    "definition",
-    "describe",
-    "explain",
-    "find",
-    "give",
-    "how",
-    "meaning",
-    "please",
-    "question",
-    "search",
-    "show",
-    "summarize",
-    "summary",
-    "tell",
-    "what",
-    "when",
-    "where",
-    "which",
-    "why",
+    "about", "answer", "define", "definition", "describe",
+    "explain", "find", "give", "how", "meaning", "please",
+    "question", "search", "show", "summarize", "summary",
+    "tell", "what", "when", "where", "which", "why",
 }
 RAG_CONTEXT_DOCS = 4
 RAG_MAX_CONTEXT_CHARS = 4_000
@@ -76,11 +61,7 @@ DEBOUNCE_SECONDS = 2.0
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".py", ".docx", ".pptx", ".csv"}
 TEMP_FILE_PREFIXES = (".", "~")
 TEMP_FILE_SUFFIXES = (
-    ".tmp",
-    ".swp",
-    ".swx",
-    ".part",
-    ".crdownload",
+    ".tmp", ".swp", ".swx", ".part", ".crdownload",
 )
 
 INVALID_FOLDER_CHARS_RE = re.compile(r"[<>:\"/\\|?*\x00-\x1f]")
@@ -117,11 +98,9 @@ MAX_RECENT_EVENTS_IN_SNAPSHOT = 14
 CLUSTER_SUMMARY_KEYWORDS = 3
 
 
-
 def is_supported_file(path: Path) -> bool:
     """Return True when the path is a supported text-bearing file."""
     return path.suffix.lower() in SUPPORTED_EXTENSIONS
-
 
 
 def is_temporary_file(path: Path) -> bool:
@@ -133,7 +112,6 @@ def is_temporary_file(path: Path) -> bool:
         or name.endswith("~")
         or lowered.endswith(TEMP_FILE_SUFFIXES)
     )
-
 
 
 def sanitize_folder_name(name: str, fallback: str) -> str:
@@ -151,7 +129,6 @@ def sanitize_folder_name(name: str, fallback: str) -> str:
     if not sanitized:
         return fallback
     return sanitized
-
 
 
 def get_log_level(default: str = "INFO") -> str:
