@@ -2,3 +2,13 @@
 __pycache__/
 *.pyc
 .env
+
+# Local-only data, environments, and generated artifacts
+.venv*/
+venv/
+env/
+.wheelcheck/
+.vscode/
+my_files/
+**/.sefs/
+SEFS_Architecture*.pdf

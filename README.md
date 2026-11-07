@@ -92,7 +92,8 @@ Use search:
 1. Enter a natural-language query in the dashboard search box.
 2. Click `Search`.
 3. SEFS retrieves top matching files and uses them as context for generation.
-4. The answer and cited retrieved context are shown under the search panel.
+4. A loading indicator appears while SEFS searches and generates an answer; the completed result identifies the query it answered.
+5. The answer and retrieved context excerpts are shown under the search panel.
 
 ## Optional Ollama Cluster Naming
 
@@ -141,7 +142,7 @@ If `ollama` is not in PATH, SEFS also checks common install paths:
 ```bash
 export SEFS_RAG_PROVIDER=huggingface
 export SEFS_HF_RAG_MODEL=google/flan-t5-small
-export SEFS_HF_RAG_MAX_NEW_TOKENS=220
+export SEFS_HF_RAG_MAX_NEW_TOKENS=64
 ```
 
 Offline behavior:

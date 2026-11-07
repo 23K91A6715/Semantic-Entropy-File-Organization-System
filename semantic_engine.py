@@ -732,7 +732,38 @@ class SemanticEngine:
             }
 
         context_docs = matches[: config.RAG_CONTEXT_DOCS]
+        is_email_query, email_answer = self._extract_email_answer(normalized_query, context_docs)
+        if is_email_query:
+            return {
+                "query": normalized_query,
+                "answer": email_answer,
+                "results": matches,
+                "used_ollama": False,
+                "generator": "extractive",
+                "error": None,
+            }
+
         answer, generator, error = self._generate_rag_answer(normalized_query, context_docs)
+        query_terms = self._rag_terms(normalized_query, include_noise=False)
+        if answer and query_terms and not query_terms.intersection(self._rag_terms(answer, include_noise=True)):
+            excerpt = next(
+                (
+                    candidate
+                    for context in context_docs
+                    if (
+                        candidate := self._select_relevant_context(
+                            str(context.get("document", "")),
+                            normalized_query,
+                            max_chars=240,
+                        )
+                    )
+                ),
+                None,
+            )
+            if excerpt:
+                answer = excerpt
+                generator = "extractive"
+
         return {
             "query": normalized_query,
             "answer": answer,
@@ -741,6 +772,54 @@ class SemanticEngine:
             "generator": generator,
             "error": error,
         }
+
+    def _extract_email_answer(
+        self,
+        query: str,
+        contexts: list[dict[str, Any]],
+    ) -> tuple[bool, str]:
+        if not re.search(r"\b(?:e-?mail|email address)\b", query, flags=re.IGNORECASE):
+            return False, ""
+
+        identity_terms = self._rag_terms(query, include_noise=False) - {
+            "email",
+            "address",
+            "contact",
+        }
+        candidates: list[tuple[int, int, list[str]]] = []
+        for position, context in enumerate(contexts):
+            document = str(context.get("document", ""))
+            emails = list(dict.fromkeys(re.findall(
+                r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
+                document,
+                flags=re.IGNORECASE,
+            )))
+            if not emails:
+                continue
+
+            name_matches = len(
+                identity_terms.intersection(self._rag_terms(document, include_noise=True))
+            )
+            candidates.append((name_matches, position, emails))
+
+        if not candidates:
+            return True, "No email address was found in the matching documents."
+
+        best_score = max(candidate[0] for candidate in candidates)
+        if identity_terms and best_score == 0:
+            return True, "No email address matching that person was found in the retrieved documents."
+
+        best_candidates = [
+            candidate for candidate in candidates if candidate[0] == best_score
+        ]
+        addresses = list(
+            dict.fromkeys(
+                email
+                for _, _, emails in best_candidates
+                for email in emails
+            )
+        )
+        return True, f"Email address: {', '.join(addresses)}."
 
     def close(self) -> None:
         """Release in-memory resources used by the engine."""
@@ -1401,6 +1480,8 @@ class SemanticEngine:
 
             if not answer:
                 return None, "HuggingFace generator returned an empty answer."
+            if re.fullmatch(r"(?:\[\d+\]\s*)+", answer):
+                return None, "HuggingFace generator returned only citation markers."
             return answer, None
         except Exception as exc:
             self.logger.debug("HuggingFace RAG generation failed: %s", exc)
@@ -1454,6 +1535,9 @@ class SemanticEngine:
         context_sections: list[str] = []
         context_budget = max_context_chars if max_context_chars is not None else config.RAG_MAX_CONTEXT_CHARS
         selected_contexts = contexts if max_docs is None else contexts[:max_docs]
+
+        documents: list[tuple[int, str, str]] = []
+        relevant_documents: list[tuple[int, str, str]] = []
         for index, item in enumerate(selected_contexts, start=1):
             text = str(item.get("document", "")).strip()
             if not text:
@@ -1461,7 +1545,17 @@ class SemanticEngine:
             if not text:
                 continue
 
-            section = f"[{index}] {item.get('filename', 'unknown')}\n{text}\n"
+            filename = str(item.get("filename", "unknown"))
+            documents.append((index, filename, text))
+            excerpt = self._select_relevant_context(text, query, context_budget)
+            if excerpt:
+                relevant_documents.append((index, filename, excerpt))
+
+        contexts_to_render = relevant_documents or documents
+        per_document_budget = max(1, context_budget // max(1, len(contexts_to_render)))
+        for index, filename, text in contexts_to_render:
+            excerpt = text if relevant_documents else text[:per_document_budget]
+            section = f"[{index}] {filename}\n{excerpt}\n"
             if len(section) > context_budget:
                 section = section[:context_budget]
             context_sections.append(section)
@@ -1473,14 +1567,68 @@ class SemanticEngine:
             return ""
 
         return (
-            "You are answering questions using only the provided document context. "
-            "If context is insufficient, say so clearly. "
-            "Cite supporting documents as [1], [2], etc.\n\n"
-            f"Query: {query}\n\n"
-            "Context:\n"
+            "Answer the question using only the provided context. "
+            "Give one concise factual sentence, not a citation alone or a copied passage. "
+            "If the context is insufficient, say so clearly.\n\n"
+            f"Question: {query}\n\n"
+            "Relevant context:\n"
             f"{''.join(context_sections)}\n"
             "Answer:"
         )
+
+    def _select_relevant_context(self, text: str, query: str, max_chars: int) -> str | None:
+        normalized_text = re.sub(r"[ \t]+", " ", text).strip()
+        query_terms = self._rag_terms(query, include_noise=False)
+        if not query_terms:
+            return None
+
+        segments: list[str] = []
+        for segment in re.split(r"(?<=[.!?])\s+|\r?\n+", normalized_text):
+            words = segment.split()
+            if len(words) > 80:
+                segments.extend(" ".join(words[start : start + 80]) for start in range(0, len(words), 60))
+            elif segment.strip():
+                segments.append(segment.strip())
+
+        scored_segments: list[tuple[int, float, int, str]] = []
+        for position, segment in enumerate(segments):
+            segment_terms = self._rag_terms(segment, include_noise=True)
+            overlap = len(query_terms.intersection(segment_terms))
+            if overlap:
+                density = overlap / len(segment_terms)
+                scored_segments.append((overlap, density, position, segment))
+
+        if not scored_segments:
+            return None
+
+        scored_segments.sort(key=lambda item: (-item[0], -item[1], item[2]))
+        selected: list[tuple[int, str]] = []
+        remaining = max_chars
+        for _, _, position, segment in scored_segments[:3]:
+            if remaining <= 0:
+                break
+            excerpt = segment
+            if len(excerpt) > remaining:
+                excerpt = excerpt[:remaining].rsplit(" ", 1)[0]
+            if excerpt:
+                selected.append((position, excerpt))
+                remaining -= len(excerpt) + 1
+
+        selected.sort(key=lambda item: item[0])
+        return " ".join(segment for _, segment in selected)
+
+    def _rag_terms(self, text: str, include_noise: bool) -> set[str]:
+        terms: set[str] = set()
+        for token in re.findall(r"[a-z0-9]+", text.lower()):
+            if len(token) < 2:
+                continue
+            normalized = self._normalize_search_token(token)
+            if normalized in ENGLISH_STOP_WORDS:
+                continue
+            if not include_noise and normalized in config.SEARCH_QUERY_NOISE_TOKENS:
+                continue
+            terms.add(normalized)
+        return terms
 
     def _run_ollama_prompt(
         self,

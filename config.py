@@ -1,4 +1,3 @@
-
 """Central configuration and utility helpers for SEFS."""
 
 from __future__ import annotations
@@ -55,7 +54,7 @@ SEARCH_QUERY_NOISE_TOKENS = {
     "tell", "what", "when", "where", "which", "why",
 }
 RAG_CONTEXT_DOCS = 4
-RAG_MAX_CONTEXT_CHARS = 4_000
+RAG_MAX_CONTEXT_CHARS = 1_200
 
 DEBOUNCE_SECONDS = 2.0
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md", ".py", ".docx", ".pptx", ".csv"}
@@ -81,7 +80,7 @@ DEFAULT_RAG_PROVIDER = "auto"
 HF_RAG_MODEL_ENV = "SEFS_HF_RAG_MODEL"
 DEFAULT_HF_RAG_MODEL = "google/flan-t5-small"
 HF_RAG_MAX_NEW_TOKENS_ENV = "SEFS_HF_RAG_MAX_NEW_TOKENS"
-DEFAULT_HF_RAG_MAX_NEW_TOKENS = 220
+DEFAULT_HF_RAG_MAX_NEW_TOKENS = 64
 HF_LOCAL_ONLY_ENV = "SEFS_HF_LOCAL_ONLY"
 
 LOG_LEVEL_ENV = "SEFS_LOG_LEVEL"

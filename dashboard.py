@@ -44,7 +44,7 @@ class SEFSDashboard:
         self._server = None
         self._thread: threading.Thread | None = None
 
-        self.app = Dash(__name__)
+        self.app = Dash(__name__, title="SEFS | Smart File Workspace")
         self.app.layout = self._build_layout()
         self._register_callbacks()
 
@@ -87,52 +87,98 @@ class SEFSDashboard:
             children=[
                 dcc.Store(id="snapshot-store", data={}),
                 dcc.Store(id="selected-file-path", data=""),
-                html.H2("SEFS Semantic Entropy File System"),
-                html.Div(id="stats-panel", style={"marginBottom": "10px"}),
+                html.Header(
+                    [
+                        html.Div("SEFS", className="hero-eyebrow"),
+                        html.H1("Your files, understood."),
+                        html.P(
+                            "A live semantic workspace for discovering, organizing, and exploring your documents.",
+                            className="hero-description",
+                        ),
+                    ],
+                    className="hero",
+                ),
+                html.Div(id="stats-panel", className="stats-region"),
                 html.Div(
                     children=[
-                        html.H3("Semantic Search + RAG"),
-                        dcc.Input(
-                            id="semantic-search-query",
-                            type="text",
-                            placeholder="Ask about your indexed files...",
-                            debounce=False,
-                            style={"width": "64%", "marginRight": "8px"},
+                        html.Div(
+                            [
+                                html.Div("01 / ASK YOUR FILES", className="section-eyebrow"),
+                                html.H2("Semantic search", className="section-title"),
+                                html.P(
+                                    "Ask a question in your own words and find answers across your documents.",
+                                    className="section-description",
+                                ),
+                            ],
+                            className="section-heading",
                         ),
-                        dcc.Input(
-                            id="semantic-search-topk",
-                            type="number",
-                            min=1,
-                            max=config.MAX_SEARCH_TOP_K,
-                            step=1,
-                            value=config.DEFAULT_SEARCH_TOP_K,
-                            style={"width": "80px", "marginRight": "8px"},
+                        html.Div(
+                            [
+                                dcc.Input(
+                                    id="semantic-search-query",
+                                    type="text",
+                                    placeholder="Try: What is the email address in my resume?",
+                                    debounce=False,
+                                    className="search-input",
+                                ),
+                                dcc.Input(
+                                    id="semantic-search-topk",
+                                    type="number",
+                                    min=1,
+                                    max=config.MAX_SEARCH_TOP_K,
+                                    step=1,
+                                    value=config.DEFAULT_SEARCH_TOP_K,
+                                    className="top-k-input",
+                                ),
+                                html.Button(
+                                    "Search files",
+                                    id="semantic-search-button",
+                                    n_clicks=0,
+                                    className="button button-primary search-button",
+                                ),
+                            ],
+                            className="search-controls",
                         ),
-                        html.Button("Search", id="semantic-search-button", n_clicks=0),
-                        html.Div(id="semantic-search-status", style={"marginTop": "8px", "color": "#444"}),
-                        html.Div(id="semantic-search-answer", style={"marginTop": "8px"}),
-                        html.Div(id="semantic-search-results", style={"marginTop": "8px"}),
+                        dcc.Loading(
+                            type="circle",
+                            children=[
+                                html.Div(id="semantic-search-status", className="search-status"),
+                                html.Div(id="semantic-search-answer", className="answer-region"),
+                                html.Div(id="semantic-search-results", className="results-region"),
+                            ],
+                        ),
                     ],
-                    style={"marginBottom": "14px"},
+                    className="surface-card search-card",
                 ),
                 dcc.Tabs(
                     value="map-tab",
+                    parent_className="tabs-shell",
+                    className="tabs",
+                    content_className="tab-content",
+                    colors={"border": "transparent", "primary": "#6d5ce8", "background": "#eef0fb"},
                     children=[
                         dcc.Tab(
                             label="Semantic Map",
                             value="map-tab",
+                            className="tab",
+                            selected_className="tab tab-selected",
                             children=[
                                 html.Div(
                                     id="selected-file-label",
-                                    style={"marginTop": "10px", "fontWeight": "600"},
+                                    className="selected-file-label",
                                     children="Select a file node to inspect conflict resolution options.",
                                 ),
                                 html.Div(
                                     children=[
-                                        html.Button("Open Selected", id="open-selected-button", n_clicks=0),
-                                        html.Span(id="open-selected-status", style={"marginLeft": "8px", "color": "#444"}),
+                                        html.Button(
+                                            "Open selected",
+                                            id="open-selected-button",
+                                            n_clicks=0,
+                                            className="button button-secondary",
+                                        ),
+                                        html.Span(id="open-selected-status", className="inline-status"),
                                     ],
-                                    style={"marginTop": "8px"},
+                                    className="file-actions",
                                 ),
                                 html.Div(
                                     children=[
@@ -140,34 +186,27 @@ class SEFSDashboard:
                                             id="rename-file-input",
                                             type="text",
                                             placeholder="New file name (e.g., notes_v2.txt)",
-                                            style={"width": "320px"},
+                                            className="rename-input",
                                         ),
                                         html.Button(
                                             "Rename Selected",
                                             id="rename-file-button",
                                             n_clicks=0,
-                                            style={"marginLeft": "8px"},
+                                            className="button button-secondary",
                                         ),
                                         html.Button(
                                             "Delete Selected",
                                             id="delete-file-button",
                                             n_clicks=0,
-                                            style={
-                                                "marginLeft": "8px",
-                                                "backgroundColor": "#9b1c1c",
-                                                "color": "#ffffff",
-                                                "border": "none",
-                                                "padding": "6px 10px",
-                                                "borderRadius": "4px",
-                                            },
+                                            className="button button-danger",
                                         ),
                                     ],
-                                    style={"marginTop": "8px", "display": "flex", "alignItems": "center"},
+                                    className="file-actions",
                                 ),
-                                html.Div(id="file-operation-status", style={"marginTop": "6px", "color": "#444"}),
+                                html.Div(id="file-operation-status", className="inline-status"),
                                 html.Div(
                                     id="conflict-message",
-                                    style={"marginTop": "8px", "fontWeight": "500", "color": "#8a6a00"},
+                                    className="conflict-message",
                                 ),
                                 html.Div(
                                     children=[
@@ -176,36 +215,46 @@ class SEFSDashboard:
                                             options=[{"label": "Auto (No Override)", "value": "__auto__"}],
                                             value="__auto__",
                                             clearable=False,
-                                            style={"minWidth": "320px"},
+                                            className="override-dropdown",
                                         ),
                                         html.Button(
                                             "Apply Override",
                                             id="apply-override-button",
                                             n_clicks=0,
-                                            style={"marginLeft": "8px"},
+                                            className="button button-secondary",
                                         ),
                                     ],
-                                    style={"display": "flex", "alignItems": "center", "gap": "8px", "marginTop": "8px"},
+                                    className="override-controls",
                                 ),
-                                html.Div(id="override-status", style={"marginTop": "8px", "color": "#444"}),
-                                dcc.Graph(id="semantic-graph", config={"displayModeBar": True, "displaylogo": False}),
-                                html.Div(id="duplicates-panel", style={"marginTop": "10px"}),
-                                html.Div(id="summaries-panel", style={"marginTop": "10px"}),
+                                html.Div(id="override-status", className="inline-status"),
+                                dcc.Graph(
+                                    id="semantic-graph",
+                                    className="chart-card",
+                                    config={"displayModeBar": True, "displaylogo": False},
+                                ),
+                                html.Div(id="duplicates-panel", className="info-card"),
+                                html.Div(id="summaries-panel", className="info-card"),
                             ],
                         ),
                         dcc.Tab(
                             label="Timeline",
                             value="timeline-tab",
+                            className="tab",
+                            selected_className="tab tab-selected",
                             children=[
-                                dcc.Graph(id="timeline-graph", config={"displayModeBar": True, "displaylogo": False}),
-                                html.Div(id="events-panel", style={"marginTop": "10px"}),
+                                dcc.Graph(
+                                    id="timeline-graph",
+                                    className="chart-card",
+                                    config={"displayModeBar": True, "displaylogo": False},
+                                ),
+                                html.Div(id="events-panel", className="info-card"),
                             ],
                         ),
                     ],
                 ),
                 dcc.Interval(id="refresh-timer", interval=config.REFRESH_INTERVAL_MS, n_intervals=0),
             ],
-            style={"maxWidth": "1240px", "margin": "0 auto", "padding": "12px"},
+            className="app-shell",
         )
 
     def _register_callbacks(self) -> None:
@@ -478,7 +527,7 @@ class SEFSDashboard:
                 response = self.query_handler(normalized_query, safe_top_k)
             except Exception as exc:
                 self.logger.exception("Search query failed")
-                return f"Search failed: {exc}", "", ""
+                return f"Search for '{normalized_query}' failed: {exc}", "", ""
 
             results = response.get("results", [])
             answer = str(response.get("answer", "")).strip()
@@ -486,24 +535,19 @@ class SEFSDashboard:
             generator = str(response.get("generator", "none"))
 
             if error:
-                status = f"Retrieved {len(results)} results. Generation error: {error}"
+                status = f"Results for '{normalized_query}': retrieved {len(results)}. Generation error: {error}"
             else:
                 provider = generator if generator != "none" else "disabled"
-                status = f"Retrieved {len(results)} results. Generator: {provider}"
+                status = f"Results for '{normalized_query}': retrieved {len(results)}. Generator: {provider}"
 
             answer_block: Any
             if answer:
                 answer_block = html.Div(
                     children=[
-                        html.H4("Answer"),
+                        html.Div("ANSWER", className="section-eyebrow"),
                         html.Pre(
                             answer,
-                            style={
-                                "whiteSpace": "pre-wrap",
-                                "backgroundColor": "#f7f7f7",
-                                "padding": "10px",
-                                "borderRadius": "6px",
-                            },
+                            className="answer-text",
                         ),
                     ]
                 )
@@ -566,16 +610,16 @@ class SEFSDashboard:
 
         clusters = sorted({str(point.get("cluster", config.UNCATEGORIZED_DIR)) for point in points})
         palette = [
-            "#1f77b4",
-            "#ff7f0e",
-            "#2ca02c",
-            "#d62728",
-            "#9467bd",
-            "#8c564b",
-            "#e377c2",
-            "#7f7f7f",
-            "#17becf",
-            "#bcbd22",
+            "#6655d8",
+            "#ef8b45",
+            "#32a98f",
+            "#e56d8b",
+            "#438ed0",
+            "#a36ac7",
+            "#d0a33f",
+            "#4eaaa9",
+            "#d46d4a",
+            "#7480cb",
         ]
 
         for index, cluster in enumerate(clusters):
@@ -617,7 +661,7 @@ class SEFSDashboard:
                         "opacity": 0.85,
                         "color": marker_colors,
                         "symbol": marker_symbols,
-                        "line": {"width": 1, "color": "#222"},
+                        "line": {"width": 2, "color": "#ffffff"},
                     },
                     hovertemplate=(
                         "<b>%{text}</b><br>"
@@ -638,6 +682,10 @@ class SEFSDashboard:
             template="plotly_white",
             legend_title="Clusters",
             hoverlabel={"align": "left"},
+            paper_bgcolor="rgba(255,255,255,0)",
+            plot_bgcolor="rgba(255,255,255,0)",
+            font={"family": "Inter, Segoe UI, sans-serif", "color": "#26324b"},
+            margin={"l": 48, "r": 24, "t": 64, "b": 48},
         )
         return figure
 
@@ -682,7 +730,10 @@ class SEFSDashboard:
                 y=total_files,
                 mode="lines+markers",
                 name="Total files",
-                line={"width": 2},
+                line={"width": 3, "color": "#6d5ce8", "shape": "spline"},
+                marker={"size": 8, "color": "#6d5ce8", "line": {"width": 2, "color": "#ffffff"}},
+                fill="tozeroy",
+                fillcolor="rgba(109,92,232,0.08)",
             )
         )
         figure.add_trace(
@@ -691,7 +742,8 @@ class SEFSDashboard:
                 y=cluster_counts,
                 mode="lines+markers",
                 name="Semantic clusters",
-                line={"width": 2},
+                line={"width": 3, "color": "#38a995", "shape": "spline"},
+                marker={"size": 8, "color": "#38a995", "line": {"width": 2, "color": "#ffffff"}},
             )
         )
         figure.update_layout(
@@ -700,10 +752,14 @@ class SEFSDashboard:
             yaxis_title="Count",
             template="plotly_white",
             legend_title="Metric",
+            paper_bgcolor="rgba(255,255,255,0)",
+            plot_bgcolor="rgba(255,255,255,0)",
+            font={"family": "Inter, Segoe UI, sans-serif", "color": "#26324b"},
+            margin={"l": 48, "r": 24, "t": 64, "b": 48},
         )
         return figure
 
-    def _build_stats(self, snapshot: dict[str, Any]) -> list[html.P]:
+    def _build_stats(self, snapshot: dict[str, Any]) -> html.Div:
         stats = snapshot.get("stats", {})
         last_update = str(stats.get("last_update_iso", ""))
         if last_update:
@@ -718,14 +774,35 @@ class SEFSDashboard:
         ambiguous_count = sum(1 for point in snapshot.get("points", []) if bool(point.get("ambiguous")))
         duplicate_count = len(snapshot.get("duplicates", []))
 
-        return [
-            html.P(f"Total files: {int(stats.get('total_files', 0))}"),
-            html.P(f"Semantic clusters: {int(stats.get('cluster_count', 0))}"),
-            html.P(f"Uncategorized: {int(stats.get('uncategorized_count', 0))}"),
-            html.P(f"Ambiguous files: {ambiguous_count}"),
-            html.P(f"Duplicate/near-duplicate pairs: {duplicate_count}"),
-            html.P(f"Last update: {last_update or 'N/A'}"),
+        metrics = [
+            ("Indexed files", int(stats.get("total_files", 0)), "metric-violet"),
+            ("Semantic clusters", int(stats.get("cluster_count", 0)), "metric-blue"),
+            ("Uncategorized", int(stats.get("uncategorized_count", 0)), "metric-amber"),
+            ("Ambiguous files", ambiguous_count, "metric-rose"),
+            ("Possible duplicates", duplicate_count, "metric-teal"),
         ]
+        return html.Div(
+            [
+                html.Div(
+                    [
+                        html.Div(str(value), className="metric-value"),
+                        html.Div(label, className="metric-label"),
+                    ],
+                    className=f"metric-card {color_class}",
+                )
+                for label, value, color_class in metrics
+            ]
+            + [
+                html.Div(
+                    [
+                        html.Div("LIVE INDEX", className="metric-live-label"),
+                        html.Div(last_update or "Waiting for first update", className="metric-live-value"),
+                    ],
+                    className="metric-card metric-live",
+                )
+            ],
+            className="stats-grid",
+        )
 
     def _build_duplicates_panel(self, snapshot: dict[str, Any]) -> Any:
         duplicates = snapshot.get("duplicates", [])
@@ -738,49 +815,73 @@ class SEFSDashboard:
                 html.Li(
                     f"{item.get('filename_a')} <-> {item.get('filename_b')} "
                     f"| similarity={float(item.get('similarity', 0.0)):.3f} "
-                    f"| {item.get('cluster_a')} / {item.get('cluster_b')}"
+                    f"| {item.get('cluster_a')} / {item.get('cluster_b')}",
+                    className="info-list-item",
                 )
             )
         return html.Div(
             [
-                html.H4("Near-Duplicate Alerts"),
-                html.Div(
-                    "Pairs above threshold are likely duplicates and should be reviewed.",
-                    style={"color": "#666"},
+                html.Div("REVIEW", className="section-eyebrow"),
+                html.H3("Near-duplicate alerts", className="info-title"),
+                html.P(
+                    "Pairs above threshold may be duplicates. Review them before removing either file.",
+                    className="info-description",
                 ),
-                html.Ul(rows),
-            ]
+                html.Ul(rows, className="info-list"),
+            ],
+            className="info-card-content",
         )
 
     def _build_summaries_panel(self, snapshot: dict[str, Any]) -> Any:
         summaries = snapshot.get("cluster_summaries", {})
         if not summaries:
-            return html.Div("Cluster summaries unavailable.")
+            return html.Div("Cluster summaries unavailable.", className="empty-note")
 
         rows = [
-            html.Li(f"{cluster}: {summary}")
+            html.Li(
+                [
+                    html.Strong(cluster, className="summary-cluster"),
+                    html.Span(summary),
+                ],
+                className="info-list-item summary-item",
+            )
             for cluster, summary in sorted(summaries.items(), key=lambda item: item[0].lower())
         ]
-        return html.Div([html.H4("Auto-Generated Cluster Summaries"), html.Ul(rows)])
+        return html.Div(
+            [
+                html.Div("DISCOVER", className="section-eyebrow"),
+                html.H3("Cluster summaries", className="info-title"),
+                html.Ul(rows, className="info-list"),
+            ],
+            className="info-card-content",
+        )
 
     def _build_events_panel(self, snapshot: dict[str, Any]) -> Any:
         events = snapshot.get("recent_events", [])
         if not events:
-            return html.Div("No semantic events yet.")
+            return html.Div("No semantic events yet.", className="empty-note")
 
         rows: list[Any] = []
         for event in reversed(events):
             rows.append(
                 html.Li(
                     f"[{event.get('type')}] {event.get('detail')} "
-                    f"(drift={float(event.get('semantic_drift', 0.0)):.2f})"
+                    f"(drift={float(event.get('semantic_drift', 0.0)):.2f})",
+                    className="info-list-item",
                 )
             )
-        return html.Div([html.H4("Recent Semantic Diff Events"), html.Ul(rows)])
+        return html.Div(
+            [
+                html.Div("ACTIVITY", className="section-eyebrow"),
+                html.H3("Recent semantic events", className="info-title"),
+                html.Ul(rows, className="info-list"),
+            ],
+            className="info-card-content",
+        )
 
     def _build_search_results(self, results: list[dict[str, Any]]) -> Any:
         if not results:
-            return html.Div("No search results yet.")
+            return html.Div("No search results yet.", className="empty-note")
 
         rows: list[Any] = []
         for index, item in enumerate(results, start=1):
@@ -788,17 +889,39 @@ class SEFSDashboard:
                 html.Li(
                     [
                         html.Div(
-                            f"{index}. {item.get('filename', 'unknown')} | "
-                            f"cluster={item.get('cluster', config.UNCATEGORIZED_DIR)} | "
-                            f"relevance={float(item.get('relevance', 0.0)):.3f}"
+                            [
+                                html.Span(f"{index:02}", className="result-number"),
+                                html.Div(
+                                    [
+                                        html.Strong(
+                                            str(item.get("filename", "unknown")),
+                                            className="result-filename",
+                                        ),
+                                        html.Span(
+                                            f"{item.get('cluster', config.UNCATEGORIZED_DIR)}"
+                                            f"  /  match {float(item.get('relevance', 0.0)):.0%}",
+                                            className="result-meta",
+                                        ),
+                                    ],
+                                    className="result-heading",
+                                ),
+                            ],
+                            className="result-title-row",
                         ),
-                        html.Div(str(item.get("snippet", "")), style={"color": "#444"}),
-                        html.Code(str(item.get("path", ""))),
+                        html.Div(str(item.get("snippet", "")), className="result-snippet"),
+                        html.Code(str(item.get("path", "")), className="result-path"),
                     ],
-                    style={"marginBottom": "8px"},
+                    className="result-card",
                 )
             )
-        return html.Div([html.H4("Retrieved Context"), html.Ol(rows)])
+        return html.Div(
+            [
+                html.Div("MATCHING DOCUMENTS", className="section-eyebrow"),
+                html.H3("Retrieved context", className="info-title"),
+                html.Ol(rows, className="results-list"),
+            ],
+            className="info-card-content",
+        )
 
     def _trim_text(self, text: str, max_chars: int) -> str:
         cleaned = " ".join(text.strip().split())
