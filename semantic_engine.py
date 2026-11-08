@@ -13,13 +13,15 @@ import subprocess
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import chromadb
-import hdbscan
 import numpy as np
-from sentence_transformers import SentenceTransformer
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, HashingVectorizer, TfidfVectorizer
+from sklearn.feature_extraction.text import (
+    ENGLISH_STOP_WORDS,
+    HashingVectorizer,
+    TfidfVectorizer,
+)
 from sklearn.manifold import TSNE
 from sklearn.metrics.pairwise import cosine_similarity
 from chromadb.config import Settings
@@ -27,10 +29,8 @@ from chromadb.config import Settings
 import config
 from extractor import TextExtractor
 
-try:
-    import umap  # type: ignore
-except Exception:  # pragma: no cover - import is environment-dependent
-    umap = None
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 
 class SemanticEngine:
@@ -246,6 +246,9 @@ class SemanticEngine:
 
             if embedded_count >= 3:
                 try:
+                    # Import HDBSCAN only when clustering is required.
+                    import hdbscan
+
                     clusterer = hdbscan.HDBSCAN(
                         min_cluster_size=config.HDBSCAN_MIN_CLUSTER_SIZE,
                         min_samples=config.HDBSCAN_MIN_SAMPLES,
@@ -255,7 +258,10 @@ class SemanticEngine:
                     )
                     labels = clusterer.fit_predict(normalized_embeddings)
                 except Exception as exc:
-                    self.logger.warning("HDBSCAN failed; falling back to Uncategorized: %s", exc)
+                    self.logger.warning(
+                        "HDBSCAN unavailable or failed; using fallback clustering: %s",
+                        exc,
+                    )
                     labels = np.full(embedded_count, -1, dtype=int)
             elif embedded_count == 2:
                 pair_similarity = float(np.dot(normalized_embeddings[0], normalized_embeddings[1]))
@@ -500,18 +506,23 @@ class SemanticEngine:
         if sample_count == 2:
             return np.array([[0.0, 0.0], [1.0, 0.0]], dtype=float)
 
-        if umap is not None:
-            try:
-                reducer = umap.UMAP(
-                    n_components=2,
-                    n_neighbors=min(15, sample_count - 1),
-                    min_dist=0.1,
-                    metric="euclidean",
-                    random_state=42,
-                )
-                return np.asarray(reducer.fit_transform(embeddings), dtype=float)
-            except Exception as exc:
-                self.logger.warning("UMAP failed; trying t-SNE fallback: %s", exc)
+        # Import UMAP only when dashboard coordinates are required.
+        try:
+            import umap
+
+            reducer = umap.UMAP(
+                n_components=2,
+                n_neighbors=min(15, sample_count - 1),
+                min_dist=0.1,
+                metric="euclidean",
+                random_state=42,
+            )
+            return np.asarray(reducer.fit_transform(embeddings), dtype=float)
+        except Exception as exc:
+            self.logger.warning(
+                "UMAP unavailable or failed; trying t-SNE fallback: %s",
+                exc,
+            )
 
         try:
             perplexity = max(1, min(30, sample_count - 1))
@@ -825,6 +836,7 @@ class SemanticEngine:
         """Release in-memory resources used by the engine."""
         with self._engine_lock:
             self._model = None
+            self._hf_rag_pipeline = None
 
     def _file_id(self, path: Path) -> str:
         return str(path.resolve(strict=False))
@@ -862,7 +874,13 @@ class SemanticEngine:
                     os.environ.setdefault("HF_HUB_OFFLINE", "1")
                     os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
                 try:
-                    self._model = SentenceTransformer(config.EMBEDDING_MODEL)
+                    # Import the heavy library only when embeddings are needed.
+                    from sentence_transformers import SentenceTransformer
+
+                    self._model = SentenceTransformer(
+                        config.EMBEDDING_MODEL,
+                        device="cpu",
+                    )
                 except Exception as exc:
                     self._model_unavailable = True
                     self.logger.warning(
